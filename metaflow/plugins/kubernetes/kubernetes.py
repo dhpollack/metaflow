@@ -149,6 +149,7 @@ class Kubernetes(object):
         run_time_limit=None,
         env=None,
         tolerations=None,
+        labels=None,
     ):
 
         if env is None:
@@ -182,6 +183,7 @@ class Kubernetes(object):
                 retries=0,
                 step_name=step_name,
                 tolerations=tolerations,
+                labels=labels,
             )
             .environment_variable("METAFLOW_CODE_SHA", code_package_sha)
             .environment_variable("METAFLOW_CODE_URL", code_package_url)
