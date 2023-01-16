@@ -7,27 +7,27 @@ import time
 from metaflow import current, util
 from metaflow.exception import MetaflowException
 from metaflow.metaflow_config import (
-    SERVICE_HEADERS,
-    SERVICE_INTERNAL_URL,
+    AZURE_STORAGE_BLOB_SERVICE_ENDPOINT,
+    CARD_AZUREROOT,
+    CARD_GSROOT,
     CARD_S3ROOT,
+    DATASTORE_SYSROOT_AZURE,
+    DATASTORE_SYSROOT_GS,
     DATASTORE_SYSROOT_S3,
     DATATOOLS_S3ROOT,
     DEFAULT_AWS_CLIENT_PROVIDER,
     DEFAULT_METADATA,
     KUBERNETES_SANDBOX_INIT_SCRIPT,
     S3_ENDPOINT_URL,
-    AZURE_STORAGE_BLOB_SERVICE_ENDPOINT,
-    DATASTORE_SYSROOT_AZURE,
-    CARD_AZUREROOT,
-    CARD_GSROOT,
-    DATASTORE_SYSROOT_GS,
+    SERVICE_HEADERS,
+    SERVICE_INTERNAL_URL,
 )
 from metaflow.mflog import (
     BASH_SAVE_LOGS,
     bash_capture_logs,
     export_mflog_env_vars,
-    tail_logs,
     get_log_tailer,
+    tail_logs,
 )
 
 from .kubernetes_client import KubernetesClient

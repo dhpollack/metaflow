@@ -2,6 +2,7 @@ import json
 import os
 import platform
 import sys
+from typing import List, Union
 
 from metaflow.decorators import StepDecorator
 from metaflow.exception import MetaflowException
@@ -15,16 +16,15 @@ from metaflow.metaflow_config import (
     KUBERNETES_LABELS,
     KUBERNETES_NAMESPACE,
     KUBERNETES_NODE_SELECTOR,
-    KUBERNETES_TOLERATIONS,
-    KUBERNETES_SERVICE_ACCOUNT,
     KUBERNETES_SECRETS,
+    KUBERNETES_SERVICE_ACCOUNT,
+    KUBERNETES_TOLERATIONS,
 )
 from metaflow.plugins.resources_decorator import ResourcesDecorator
 from metaflow.plugins.timeout_decorator import get_run_time_limit_for_task
 from metaflow.sidecar import Sidecar
 
 from ..aws.aws_utils import get_docker_registry
-
 from .kubernetes import KubernetesException
 
 try:
@@ -70,7 +70,7 @@ class KubernetesDecorator(StepDecorator):
         Kubernetes tolerations to use when launching pod in Kubernetes. If
         not specified, the value of `METAFLOW_KUBERNETES_TOLERATIONS` is used
         from Metaflow configuration.
-    labels : Dict[str, str]
+    labels : List[str]
         Kubernetes labels to use when launching pod in Kubernetes. If
         not specified, the value of `METAFLOW_KUBERNETES_LABELS` is used
         from Metaflow configuration.
@@ -85,7 +85,7 @@ class KubernetesDecorator(StepDecorator):
         "service_account": None,
         "secrets": None,  # e.g., mysecret
         "node_selector": None,  # e.g., kubernetes.io/os=linux
-        "labels": None,  # e.g., {"my_label": "my_value"}
+        "labels": None,  # e.g., my_label=my_value
         "namespace": None,
         "gpu": None,  # value of 0 implies that the scheduled node should not have GPUs
         "gpu_vendor": None,
@@ -109,11 +109,16 @@ class KubernetesDecorator(StepDecorator):
             self.attributes["node_selector"] = KUBERNETES_NODE_SELECTOR
         if not self.attributes["tolerations"] and KUBERNETES_TOLERATIONS:
             self.attributes["tolerations"] = json.loads(KUBERNETES_TOLERATIONS)
-        if not self.attributes["labels"] and KUBERNETES_LABELS is not None:
+        if not self.attributes["labels"] and KUBERNETES_LABELS:
             self.attributes["labels"] = KUBERNETES_LABELS
 
+        if isinstance(self.attributes["labels"], str):
+            self.attributes["labels"] = self.parse_kube_list(
+                self.attributes["labels"].split(","), False
+            )
+
         if isinstance(self.attributes["node_selector"], str):
-            self.attributes["node_selector"] = self.parse_node_selector(
+            self.attributes["node_selector"] = self.parse_kube_list(
                 self.attributes["node_selector"].split(",")
             )
 
@@ -292,9 +297,12 @@ class KubernetesDecorator(StepDecorator):
             for k, v in self.attributes.items():
                 if k == "namespace":
                     cli_args.command_options["k8s_namespace"] = v
-                elif k == "node_selector" and v:
+                elif k in {"node_selector", "labels"} and v:
                     cli_args.command_options[k] = ",".join(
-                        ["=".join([key, str(val)]) for key, val in v.items()]
+                        [
+                            "=".join([key, str(val)]) if val else key
+                            for key, val in v.items()
+                        ]
                     )
                 elif k == "tolerations":
                     cli_args.command_options[k] = json.dumps(v)
@@ -392,13 +400,14 @@ class KubernetesDecorator(StepDecorator):
             )[0]
 
     @staticmethod
-    def parse_node_selector(node_selector: list):
+    def parse_kube_list(items: Union[str, List[str]], requires_both: bool = True):
         try:
-            return {
-                str(k.split("=", 1)[0]): str(k.split("=", 1)[1])
-                for k in node_selector or []
-            }
+            ret = {}
+            for item_str in items:
+                item = item_str.split("=", 1)
+                if requires_both:
+                    item[1]  # raise IndexError
+                ret[str(item[0])] = str(item[1]) if len(item) > 1 else None
+            return ret
         except (AttributeError, IndexError):
-            raise KubernetesException(
-                "Unable to parse node_selector: %s" % node_selector
-            )
+            raise KubernetesException("Unable to parse kubernetes list: %s" % items)
